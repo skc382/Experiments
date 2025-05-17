@@ -3,3 +3,4 @@ venv/
 .idea/
 .git/
 .DS_Store
+__pycache__
