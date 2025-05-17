@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: flask-websocket-app
+    image: shreedharkc/shreedhar-experiment-websocket-app
     ports:
       - "5000:5000"
     env_file:
