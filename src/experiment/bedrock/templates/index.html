@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Bedrock WebSocket Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #chat-container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+        }
+        .model-message {
+            background-color: #f5f5f5;
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>AWS Bedrock WebSocket Demo</h1>
+    <div id="chat-container"></div>
+    <textarea id="prompt" rows="4" placeholder="Enter your prompt here..."></textarea>
+    <button onclick="sendPrompt()">Send</button>
+
+    <script>
+        const socket = io();
+        const chatContainer = document.getElementById('chat-container');
+
+        function addMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function sendPrompt() {
+            const promptInput = document.getElementById('prompt');
+            const prompt = promptInput.value.trim();
+            
+            if (prompt) {
+                addMessage(`You: ${prompt}`, 'user');
+                socket.emit('query_model', { prompt: prompt });
+                promptInput.value = '';
+            }
+        }
+
+        socket.on('model_response', function(data) {
+            if (data.status === 'success') {
+                addMessage(`Model: ${data.response}`, 'model');
+            } else {
+                addMessage(`Error: ${data.error}`, 'error');
+            }
+        });
+
+        // Handle Enter key
+        document.getElementById('prompt').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendPrompt();
+            }
+        });
+    </script>
+</body>
+</html> 
