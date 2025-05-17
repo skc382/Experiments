@@ -1,0 +1,18 @@
+{
+    "schemaVersion": "messages-v1",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "text": "Describe the purpose of a hello world program in one line."
+          }
+        ]
+      }
+    ],
+    "inferenceConfig": {
+      "maxTokens": "512",
+      "temperature": "0.5",
+      "topP": "0.9"
+    }
+  }
