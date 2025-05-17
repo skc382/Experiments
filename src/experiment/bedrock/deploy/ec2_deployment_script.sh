@@ -53,4 +53,21 @@ echo "Adding current user to docker group..."
 usermod -aG docker ${SUDO_USER:-$USER}
 
 echo "Docker installation completed successfully!"
-echo "Log out and back in to use Docker without sudo, or run 'newgrp docker' in this session."
+
+sudo apt install git-all
+echo "Git installation completed successfully!"
+
+echo "Git clone from: https://github.com/skc382/Experiments.git"
+git clone https://github.com/skc382/Experiments.git
+
+echo "cd into folder: Experiments/src/experiment/bedrock"
+cd Experiments/src/experiment/bedrock
+
+echo "Run docker compose upt"
+docker compose up -d
+
+echo "Sleeping for 10 seconds"
+sleep 15
+
+echo "Check if the app is deployed"
+curl http://localhost:5000/api/websocket

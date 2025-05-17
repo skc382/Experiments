@@ -97,15 +97,7 @@ To run the application without Docker:
 To run the application in a Docker container:
 1. Run the container, mapping port 5000 and passing environment variables:
    ```bash
-   docker run -p 5000:5000 \
-       -e SECRET_KEY=your-secret-key \
-       -e AWS_REGION=us-east-1 \
-       -e AWS_ACCESS_KEY_ID=your-aws-access-key \
-       -e AWS_SECRET_ACCESS_KEY=your-aws-secret-key \
-       -e APP_HOST=0.0.0.0 \
-       -e APP_PORT=5000 \
-       -e FLASK_ENV=production \
-       flask-websocket-app
+   docker compose up 
    ```
 2. Access the application:
    - Web interface: `http://localhost:5000`
@@ -136,35 +128,7 @@ The `/api/websocket` endpoint returns the WebSocket connection URL.
 3. If you have a client-side WebSocket implementation (e.g., using Socket.IO), verify that it connects to the server and sends/receives messages.
 
 ### 3. Test WebSocket Communication
-To test the WebSocket functionality, you need a client that connects to the WebSocket server and sends a `query_model` event. Below is a simple JavaScript example for testing:
-
-```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
-<script>
-    fetch('http://localhost:5000/api/websocket')
-        .then(response => response.json())
-        .then(data => {
-            const socket = io(data.websocket_url);
-            socket.on('connect', () => {
-                console.log('Connected to WebSocket');
-                socket.emit('query_model', { prompt: 'Hello, world!' });
-            });
-            socket.on('model_response', (data) => {
-                console.log('Response:', data);
-            });
-        });
-</script>
-```
-
-- Save this as `test.html`, open it in a browser, and check the console for output.
-- **Expected Behavior**:
-  - The client connects to the WebSocket server.
-  - It sends a `query_model` event with a prompt.
-  - The server responds with a `model_response` event containing the AWS Bedrock model's output or an error.
-
-### 4. Test Error Handling
-- Send an invalid prompt or use incorrect AWS credentials to verify that the application handles errors gracefully.
-- Check the `model_response` event for an `error` status with a descriptive message.
+To test the WebSocket functionality, open the [test client here](test/test_client.html) in a browser.
 
 ## Notes
 - **Security**: Keep AWS credentials and `SECRET_KEY` secure. Use a `.env` file or Docker environment variables instead of hardcoding them.
