@@ -47,6 +47,12 @@ To run the application in a Docker container:
 ## Testing the Application
 
 ### 1. Test the WebSocket API
+Install wscat on mac
+```bash
+$ brew install node
+$ npm install -g wscat
+```
+
 The `/ws/graphrag` endpoint returns the WebSocket connection URL.
 - **Command**:
   ```bash
