@@ -14,19 +14,15 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies and verify gunicorn
-RUN pip install --no-cache-dir -r requirements.txt \
-    && gunicorn --version
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN uvicorn --version
 
 # Copy application code
 COPY src/main .
 
-# Expose the application port
-EXPOSE 5000
+# Expose port for FastAPI
+EXPOSE 8000
 
-# Set environment variables
-ENV FLASK_ENV=production
-ENV APP_HOST=0.0.0.0
-ENV APP_PORT=5000
-
-# Run the application with Gunicorn
-CMD ["gunicorn", "--worker-class=eventlet", "-w", "1", "--bind=0.0.0.0:5000", "app:app"]
+# Run the application with uvicorn
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

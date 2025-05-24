@@ -61,7 +61,7 @@ echo "Git clone from: https://github.com/skc382/Experiments.git"
 git clone https://github.com/skc382/Experiments.git
 
 echo "cd into folder: Experiments/src/experiment/bedrock"
-cd Experiments/src/experiment/main
+cd Experiments/
 
 echo "Run docker compose upt"
 docker compose up -d
