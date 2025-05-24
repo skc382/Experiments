@@ -9,5 +9,5 @@ venv/
 *.log
 .git
 .gitignore
-Dockerfile
+../../Dockerfile
 *.md

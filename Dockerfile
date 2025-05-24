@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && gunicorn --version
 
 # Copy application code
-COPY . .
+COPY src/main .
 
 # Expose the application port
 EXPOSE 5000

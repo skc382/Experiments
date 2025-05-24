@@ -128,7 +128,7 @@ The `/api/websocket` endpoint returns the WebSocket connection URL.
 3. If you have a client-side WebSocket implementation (e.g., using Socket.IO), verify that it connects to the server and sends/receives messages.
 
 ### 3. Test WebSocket Communication
-To test the WebSocket functionality, open the [test client here](test/test_client.html) in a browser.
+To test the WebSocket functionality, open the [test client here](src/test/test_client.html) in a browser.
 
 ## Notes
 - **Security**: Keep AWS credentials and `SECRET_KEY` secure. Use a `.env` file or Docker environment variables instead of hardcoding them.

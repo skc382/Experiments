@@ -3,13 +3,13 @@ version: '3.8'
 services:
   web:
     build:
-      context: .
+      context: src/main
       dockerfile: Dockerfile
     image: shreedharkc/shreedhar-experiment-websocket-app:latest
     ports:
       - "5000:5000"
     env_file:
-      - .env
+      - src/main/.env
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=5000
