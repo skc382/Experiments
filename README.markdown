@@ -54,13 +54,21 @@ $ npm install -g wscat
 ```
 
 The `/ws/graphrag` endpoint returns the WebSocket connection URL.
+- **Refer to:**
+  - **[SAMPLE_IMAGE_DATA.json](src/main/utils/sample_image_data.json) to an example of base64 data**
+
+
+
 - **Command**:
   ```bash
   $ wscat -c ws://localhost:8000/ws/graphrag
   $ Connected (press CTRL+C to quit)
   > {"session_id": "sess123", "child_id": "C001"}
   > {"prompt": "Explain Aarav’s doing in extra-curricular classes"}
+  > {"prompt": "What is happening in this image?", "image_data": "[sample_image_data.json](src/main/utils/sample_image_data.json)"}
   ```
+  
+
 - **Expected Response** (in development):
   ```bash
   {"response": [{"text": "It's wonderful to see Aarav Sharma engaging in a variety of activities both 

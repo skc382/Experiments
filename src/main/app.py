@@ -1,17 +1,21 @@
-import asyncio
+import base64
 import json
 import logging
 import os
-from datetime import datetime
 from typing import Dict
+from typing import Tuple, Union
+
 import boto3
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, HTTPException, UploadFile
+from fastapi import File
+from fastapi import WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from langchain_community.graphs import Neo4jGraph
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel
-
-from dotenv import load_dotenv
-
+from types import SimpleNamespace
+from utils.json_validations import validate_and_load, SchemaOneModel, SchemaTwoModel
 # Load environment variables
 load_dotenv()
 
@@ -36,6 +40,30 @@ bedrock_client = boto3.client("bedrock-runtime", region_name=AWS_REGION,
                               aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
                               aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'))
 
+def template_request_body():
+    system_list = [
+        {
+            "text": "You are an empathetic loving ai assistant. Respond to the prompt within 1-2 sentences, "
+                    "try to be helpful and caring."
+        }
+    ]
+
+    return {
+        "schemaVersion": "messages-v1",
+        "system": system_list,
+        "messages": [
+            {
+                "role": "user",
+                "content": []
+            }
+        ],
+        "inferenceConfig": {
+            "maxTokens": "512",
+            "temperature": "0.7"
+        }
+    }
+
+
 # Pydantic model for prompt
 class PromptRequest(BaseModel):
     child_id: str
@@ -43,7 +71,7 @@ class PromptRequest(BaseModel):
     session_id: str  # For WebSocket auth
 
 # GraphRAG query to retrieve context
-def get_graph_context(child_id: str) -> str:
+def build_graph_context(child_id: str) -> str:
     try:
         query = f"""
         MATCH (c:Child {{child_id: '{child_id}'}})-[:ASSIGNED]->(h:Homework),
@@ -70,32 +98,39 @@ def get_graph_context(child_id: str) -> str:
         return "Error retrieving graph context."
 
 # Call Bedrock Nova Lite
-async def call_bedrock(context: str, prompt: str) -> str:
+async def call_bedrock(context: str, **kwargs) -> str:
     try:
+        request_body = template_request_body()
+        prompt = kwargs.get('prompt')
+
         prompt_template = PromptTemplate(
-            template="Context: {context}\nInstruction: {prompt}\nRespond in 4–6 sentences, empathetic tone, parent-friendly.",
+            template="Context: {context}\nInstruction: {prompt}\nRespond in 2-3 sentences, empathetic tone, parent-friendly.",
             input_variables=["context", "prompt"]
         )
         formatted_prompt = prompt_template.format(context=context, prompt=prompt)
-        request = {
-            "schemaVersion": "messages-v1",
-            "messages": [
+
+        if  kwargs.get('image_hex'):
+            image_hex_bytes = kwargs.get('image_hex')
+            request_body["messages"][0]["content"].append(
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "text": formatted_prompt
-                         }
-                    ]
+                    "image": {
+                        "format": "jpeg",
+                        "source": {
+                            "bytes": image_hex_bytes
+                        }
+                    }
                 }
-            ],
-            "inferenceConfig": {
-                "maxTokens": "512",
-                "temperature": "0.7"
+            )
+
+
+        request_body["messages"][0]["content"].append(
+            {
+                "text": formatted_prompt
             }
-        }
+        )
+
         response = bedrock_client.invoke_model(
-            body=json.dumps(request),
+            body=json.dumps(request_body),
             modelId="amazon.nova-lite-v1:0"
         )
         # Parse the response
@@ -106,13 +141,15 @@ async def call_bedrock(context: str, prompt: str) -> str:
         return "Error generating response from Bedrock."
 
 # WebSocket connection manager
-class ConnectionManager:
+class SessionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
+        self.active_contexts: Dict[str, str] = {}
 
     async def initialize(self, websocket: WebSocket):
         await websocket.accept()
         logger.info(f"Connected opened, awaiting session object")
+        await websocket.send_text(json.dumps({"msg": "To setup session, Send session-id with child-id"}))
 
     async def connect(self, websocket: WebSocket, session_id: str):
         # await websocket.accept()
@@ -124,11 +161,33 @@ class ConnectionManager:
             del self.active_connections[session_id]
             logger.info(f"Disconnected: {session_id}")
 
+    def set_graph_context(self, session_id: str, context: str):
+        if session_id in self.active_connections and session_id not in self.active_contexts:
+            self.active_contexts[session_id] = context
+
+        if session_id not in self.active_connections and session_id in self.active_contexts:
+            del self.active_contexts[session_id]
+            logger.info(f"Deleted dangling context from session: {session_id}")
+
+    def get_graph_context(self, session_id: str):
+        return self.active_contexts.get(session_id)
+
+
     async def send_message(self, session_id: str, message: str):
         if session_id in self.active_connections:
             await self.active_connections[session_id].send_text(message)
 
-manager = ConnectionManager()
+manager = SessionManager()
+
+@app.post("/uploadfile/")
+async def create_upload_file(file: UploadFile = File(...)):
+    return {"filename": file.filename, "content_type": file.content_type}
+
+@app.post("/image-base64/")
+async def upload_image(file: UploadFile = File(...)):
+    contents = await file.read()
+    encoded_image = base64.b64encode(contents).decode("utf-8")
+    return {"image_data": encoded_image}
 
 # WebSocket endpoint
 @app.websocket("/ws/graphrag")
@@ -152,16 +211,28 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             try:
                 # Receive prompt
-                message = await websocket.receive_json()
-                prompt = message.get("prompt")
-                if not prompt:
+                await manager.send_message(session_id, json.dumps({"msg": "Enter prompt"}))
+                input_json = await websocket.receive_json()
+                schema_ns, payload = validate_and_load(input_json)
+
+                # prompt_data = payload.prompt
+                #
+                # await manager.send_message(session_id, json.dumps({
+                #     "msg": """Enter image as base64 string, if not press enter. format json: {"image_data": "image_base64_string"}"""}))
+
+                if not payload.prompt:
                     await manager.send_message(session_id, json.dumps({"error": "No prompt provided"}))
                     continue
 
-                logger.info(f"Received prompt for {child_id}: {prompt}")
+                logger.info(f"Received prompt for {child_id}: {payload.prompt}, "
+                            f"Image: {'Yes' if isinstance(payload, SchemaTwoModel) and payload.image_data else 'No'}")
 
                 # Get graph context
-                context = get_graph_context(child_id)
+                if not manager.get_graph_context(session_id):
+                    ctx = build_graph_context(child_id)
+                    manager.set_graph_context(session_id, ctx)
+
+                context = manager.get_graph_context(session_id)
                 if "Error" in context:
                     await manager.send_message(
                         session_id,
@@ -169,8 +240,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                     continue
 
-                # Call Bedrock
-                response = await call_bedrock(context, prompt)
+                image_data_hex_value=None
+                # Add image if provided
+                if isinstance(payload, SchemaTwoModel) and payload.image_data:
+                    try:
+                        image_data = payload.image_data
+                        # Decode base64 image
+                        image_bytes = base64.b64decode(
+                            image_data.split(",")[1] if "," in image_data else image_data)
+                        # image_data_hex_value=image_bytes.hex()
+                        image_data_hex_value=image_data
+
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({"error": f"Invalid image data: {str(e)}"}))
+                        continue
+
+                response = await call_bedrock(context, prompt=payload.prompt, image_hex=image_data_hex_value)
+
                 if "Error" in response:
                     await manager.send_message(
                         session_id,
@@ -191,7 +277,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(f"WebSocket error: {str(e)}")
                 await manager.send_message(
                     session_id,
-                    json.dumps({"error": "Internal server error"})
+                    json.dumps({"error": f"Internal server error: {str(e)}"})
                 )
 
     except Exception as e:
